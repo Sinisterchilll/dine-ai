@@ -1,74 +1,36 @@
-# 🌿 DineAI — AI-Powered Restaurant Assistant
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-An AI dining companion that helps restaurant customers explore the menu, get personalized recommendations, and place orders through a conversational interface.
+## Getting Started
 
-## Features
-
-- **Phone + OTP Login** (demo mode — any 4 digits work)
-- **AI Chat** powered by Claude — knows the full menu, handles dietary needs, allergens, multilingual support (Hindi/Kannada/English)
-- **Full Menu Browser** with category filters, veg-only toggle, spice levels, calories
-- **Cart & Ordering** with GST calculation and order history
-- **User Memory** — remembers past orders and personalizes recommendations for returning customers
-- **Reorder** past meals with one tap
-
-## Quick Deploy to Vercel (3 minutes)
-
-### Step 1: Push to GitHub
+First, run the development server:
 
 ```bash
-cd dine-ai
-git init
-git add .
-git commit -m "Initial commit"
-gh repo create dine-ai --public --push
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-Or create a repo manually on GitHub and push.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### Step 2: Deploy on Vercel
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-1. Go to [vercel.com](https://vercel.com) → **Add New Project**
-2. Import your GitHub repo
-3. In **Environment Variables**, add:
-   - `ANTHROPIC_API_KEY` = your Anthropic API key (get one at [console.anthropic.com](https://console.anthropic.com))
-4. Click **Deploy**
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-### Step 3: Share the URL!
+## Learn More
 
-Vercel gives you a URL like `dine-ai-xyz.vercel.app` — share it with your friends.
+To learn more about Next.js, take a look at the following resources:
 
-## Project Structure
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-```
-dine-ai/
-├── api/
-│   └── chat.js          # Serverless function (proxies Claude API)
-├── public/
-│   └── index.html       # Complete frontend (React via CDN)
-├── vercel.json          # Routing config
-├── package.json
-└── README.md
-```
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## How It Works
+## Deploy on Vercel
 
-- **Frontend**: Single HTML file with React 18 loaded via CDN. No build step needed.
-- **Backend**: One serverless function (`/api/chat`) that proxies requests to the Anthropic Claude API. This avoids exposing your API key in the browser.
-- **Storage**: Uses `localStorage` for user sessions and order history. Data persists on each user's device.
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-## Customizing the Menu
-
-Edit the `RESTAURANT` object in `public/index.html` to change:
-- Restaurant name, tagline
-- Menu items (name, price, category, description, allergens, calories, spice level)
-- Today's specials
-- Out of stock items
-
-## Cost Estimate
-
-- **Vercel hosting**: Free tier covers ~100K requests/month
-- **Claude API**: ~₹0.50-1.00 per conversation (using Claude Sonnet). For 100 conversations/day ≈ ₹1,500-3,000/month
-
-## License
-
-MIT
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
