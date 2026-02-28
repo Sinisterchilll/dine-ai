@@ -12,7 +12,7 @@ export default async function TablePage({ params }: { params: Promise<{ slug: st
   if (!restaurant || restaurant.status !== 'active') notFound();
 
   const [table] = await db.select().from(tables).where(
-    and(eq(tables.id, parseInt(tableId)), eq(tables.restaurant_id, restaurant.id))
+    and(eq(tables.table_number, parseInt(tableId)), eq(tables.restaurant_id, restaurant.id))
   );
   if (!table) notFound();
 

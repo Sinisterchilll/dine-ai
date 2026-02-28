@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ tabl
 
   const [restaurant] = await db.select().from(restaurants).where(eq(restaurants.id, user.restaurantId!));
   const baseUrl = req.nextUrl.origin;
-  const url = `${baseUrl}/r/${restaurant.slug}/t/${table.id}`;
+  const url = `${baseUrl}/r/${restaurant.slug}/t/${table.table_number}`;
   const buffer = await generateQRCode(url);
 
   return new NextResponse(new Uint8Array(buffer), {
