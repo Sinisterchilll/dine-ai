@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 
 const JWT_SECRET = new TextEncoder().encode(

@@ -4,7 +4,7 @@ config({ path: '.env.local' });
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from '../src/lib/db/schema';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const client = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
 const db = drizzle(client, { schema });
