@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Search } from 'lucide-react';
 import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 
 interface Restaurant {
   id: number; name: string; slug: string; logo_emoji: string | null;
@@ -61,6 +62,21 @@ export default function SuperRestaurantsPage() {
 
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }));
+  }
+
+  async function toggleStatus(r: Restaurant) {
+    const newStatus = r.status === 'active' ? 'inactive' : 'active';
+    const res = await fetch(`/api/super/restaurants/${r.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (res.ok) {
+      setRestaurants(prev => prev.map(x => x.id === r.id ? { ...x, status: newStatus } : x));
+      toast.success(`${r.name} ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
+    } else {
+      toast.error('Failed to update status');
+    }
   }
 
   return (
@@ -134,26 +150,38 @@ export default function SuperRestaurantsPage() {
         {filtered.map(r => (
           <Card key={r.id}>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="text-3xl">{r.logo_emoji}</span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Link href={`/super/restaurants/${r.id}`} className="font-semibold hover:underline">{r.name}</Link>
-                      <Badge variant={r.status === 'active' ? 'default' : 'secondary'}>{r.status}</Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground">{r.cuisine_type} • slug: {r.slug}</div>
+              <div className="flex items-center gap-4">
+                <span className="text-3xl">{r.logo_emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link href={`/super/restaurants/${r.id}`} className="font-semibold hover:underline">{r.name}</Link>
+                    <Badge variant={r.status === 'active' ? 'default' : 'secondary'}>{r.status}</Badge>
+                    <Link href={`/r/${r.slug}`} target="_blank" className="text-xs text-amber-400 flex items-center gap-1 hover:underline">
+                      <ExternalLink className="h-3 w-3" /> Open
+                    </Link>
                   </div>
+                  <div className="text-sm text-muted-foreground">{r.cuisine_type || 'Restaurant'} • {r.chatCount} chats • {r.menuCount} items • <span className="text-amber-400">${r.totalCost.toFixed(4)} AI</span></div>
                 </div>
-                <div className="text-right text-sm">
-                  <div className="text-muted-foreground">{r.chatCount} chats</div>
-                  <div className="text-muted-foreground">{r.menuCount} items</div>
-                  <div className="text-xs text-amber-400">${r.totalCost.toFixed(4)} AI cost</div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button variant="outline" size="sm"
+                    className={r.status === 'active' ? 'text-destructive text-xs h-8' : 'text-green-500 text-xs h-8'}
+                    onClick={() => toggleStatus(r)}
+                  >
+                    {r.status === 'active' ? 'Deactivate' : 'Activate'}
+                  </Button>
+                  <Link href={`/super/restaurants/${r.id}`}>
+                    <Button variant="outline" size="sm" className="h-8 text-xs">Manage →</Button>
+                  </Link>
                 </div>
               </div>
             </CardContent>
           </Card>
         ))}
+        {filtered.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            {search ? 'No restaurants match your search.' : 'No restaurants yet. Add one above.'}
+          </div>
+        )}
       </div>
     </div>
   );

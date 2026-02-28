@@ -111,3 +111,14 @@ export const token_usage = pgTable('token_usage', {
   cost_usd: real('cost_usd').notNull(),
   created_at: text('created_at').default(sql`now()`),
 });
+
+export const customer_preferences = pgTable('customer_preferences', {
+  id: serial('id').primaryKey(),
+  device_id: text('device_id').notNull(),
+  restaurant_id: integer('restaurant_id').references(() => restaurants.id, { onDelete: 'cascade' }),
+  dietary: text('dietary'),       // JSON array: ['vegetarian','vegan','gluten-free',...]
+  allergens: text('allergens'),   // JSON array: ['dairy','nuts',...]
+  spice_pref: text('spice_pref'),  // 'mild'|'medium'|'spicy'
+  notes: text('notes'),
+  updated_at: text('updated_at').default(sql`now()`),
+});

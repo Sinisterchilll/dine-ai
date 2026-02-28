@@ -2,8 +2,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { db } from '@/lib/db';
-import { restaurants, restaurant_configs, menu_items, categories, orders, chat_messages, sessions, token_usage } from '@/lib/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { restaurants, restaurant_configs, menu_items, categories, orders, chat_messages, sessions, token_usage, customer_preferences } from '@/lib/db/schema';
+import { eq, desc, and } from 'drizzle-orm';
 import { buildSystemPrompt } from '@/lib/ai';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -26,7 +26,7 @@ const ADD_TO_CART_TOOL: Anthropic.Tool = {
         items: {
           type: 'object',
           properties: {
-            id: { type: 'number', description: 'The menu item ID' },
+            id: { type: 'number', description: 'The menu item ID shown as [ID:X] in the menu' },
             name: { type: 'string', description: 'The menu item name' },
             price: { type: 'number', description: 'The price of one unit' },
             qty: { type: 'number', description: 'Quantity to add (minimum 1)' },
@@ -39,9 +39,23 @@ const ADD_TO_CART_TOOL: Anthropic.Tool = {
   },
 };
 
+const SAVE_PREF_TOOL: Anthropic.Tool = {
+  name: 'save_customer_preference',
+  description: "Silently save the customer's dietary/allergy/spice preferences for future visits. Call this whenever the customer mentions being vegetarian, vegan, having allergies, or a spice preference. This is a background action — do NOT mention to the customer that you're saving their preferences.",
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      dietary: { type: 'array', items: { type: 'string' }, description: "e.g. ['vegetarian', 'vegan', 'gluten-free']" },
+      allergens: { type: 'array', items: { type: 'string' }, description: "e.g. ['dairy', 'nuts', 'gluten']" },
+      spice_pref: { type: 'string', description: "One of: 'mild', 'medium', 'spicy'" },
+      notes: { type: 'string', description: 'Any other relevant notes about the customer' },
+    },
+  },
+};
+
 export async function POST(req: NextRequest) {
   try {
-    const { session_id, restaurant_id, messages, cart } = await req.json();
+    const { session_id, restaurant_id, messages, cart, device_id } = await req.json();
 
     if (!restaurant_id || !messages?.length) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -82,22 +96,38 @@ export async function POST(req: NextRequest) {
         .from(orders).where(eq(orders.session_id, session_id)).orderBy(desc(orders.created_at)).limit(5);
     }
 
-    const systemPrompt = buildSystemPrompt(restaurant, config || {
-      ai_personality: 'friendly', ai_greeting: null, custom_knowledge: null, languages: '["English"]',
-    }, menuWithCategories, pastOrders, customerName, cart || []) +
-      '\n\nYou have an add_to_cart tool. Use it immediately when the customer explicitly asks to order or add specific items. Be proactive — if they say "I\'ll have X", call the tool.';
+    // Load customer preferences for personalization
+    let customerPrefs = null;
+    if (device_id) {
+      const [prefs] = await db.select()
+        .from(customer_preferences)
+        .where(and(eq(customer_preferences.device_id, device_id), eq(customer_preferences.restaurant_id, restaurant_id)));
+      customerPrefs = prefs || null;
+    }
+
+    const systemPrompt = buildSystemPrompt(
+      restaurant,
+      config || { ai_personality: 'friendly', ai_greeting: null, custom_knowledge: null, languages: '["English"]' },
+      menuWithCategories,
+      pastOrders,
+      customerName,
+      cart || [],
+      customerPrefs,
+    ) + '\n\nYou have tools available: add_to_cart (use when customer explicitly orders) and save_customer_preference (use silently when customer mentions dietary needs). Be proactive with add_to_cart — if they say "I\'ll have X", call it immediately.';
 
     const anthropicMessages: Anthropic.MessageParam[] = messages.map((m: { role: string; content: string }) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }));
 
+    const tools = [ADD_TO_CART_TOOL, SAVE_PREF_TOOL];
+
     // First API call
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1024,
       system: systemPrompt,
-      tools: [ADD_TO_CART_TOOL],
+      tools,
       messages: anthropicMessages,
     });
 
@@ -106,41 +136,78 @@ export async function POST(req: NextRequest) {
     let totalInputTokens = response.usage.input_tokens;
     let totalOutputTokens = response.usage.output_tokens;
 
+    // Handle tool use — may be add_to_cart, save_customer_preference, or both
     if (response.stop_reason === 'tool_use') {
-      const toolUseBlock = response.content.find(b => b.type === 'tool_use') as Anthropic.ToolUseBlock | undefined;
+      const toolUseBlocks = response.content.filter(b => b.type === 'tool_use') as Anthropic.ToolUseBlock[];
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
-      if (toolUseBlock?.name === 'add_to_cart') {
-        const input = toolUseBlock.input as { items: CartItem[] };
-        // Validate items against actual in-stock menu
-        cartActions = (input.items || []).filter(item => {
-          const found = menuWithCategories.find(m => m.id === item.id);
-          return found && found.in_stock;
-        }).map(item => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
-          qty: Math.max(1, Math.round(item.qty)),
-        }));
+      for (const toolBlock of toolUseBlocks) {
+        if (toolBlock.name === 'add_to_cart') {
+          const input = toolBlock.input as { items: CartItem[] };
+          // Try ID match first, fall back to name match (Claude sometimes makes up IDs)
+          cartActions = (input.items || []).flatMap(item => {
+            const found = menuWithCategories.find(m => m.id === item.id)
+              || menuWithCategories.find(m => m.name.toLowerCase() === item.name.toLowerCase());
+            if (!found || !found.in_stock) return [];
+            return [{ id: found.id, name: found.name, price: found.price, qty: Math.max(1, Math.round(item.qty)) }];
+          });
+
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: toolBlock.id,
+            content: cartActions.length > 0
+              ? `Added to cart: ${cartActions.map(i => `${i.qty}× ${i.name} (₹${i.price * i.qty})`).join(', ')}`
+              : 'Could not add items — they may be out of stock or not on the menu.',
+          });
+        } else if (toolBlock.name === 'save_customer_preference') {
+          // Save preferences silently in background
+          const input = toolBlock.input as { dietary?: string[]; allergens?: string[]; spice_pref?: string; notes?: string };
+          if (device_id) {
+            try {
+              // Check if row exists
+              const [existing] = await db.select()
+                .from(customer_preferences)
+                .where(and(eq(customer_preferences.device_id, device_id), eq(customer_preferences.restaurant_id, restaurant_id)));
+
+              const updates = {
+                device_id,
+                restaurant_id,
+                dietary: input.dietary ? JSON.stringify(input.dietary) : (existing?.dietary ?? null),
+                allergens: input.allergens ? JSON.stringify(input.allergens) : (existing?.allergens ?? null),
+                spice_pref: input.spice_pref ?? existing?.spice_pref ?? null,
+                notes: input.notes ?? existing?.notes ?? null,
+                updated_at: new Date().toISOString(),
+              };
+
+              if (existing) {
+                await db.update(customer_preferences).set(updates).where(eq(customer_preferences.id, existing.id));
+              } else {
+                await db.insert(customer_preferences).values(updates);
+              }
+            } catch (e) {
+              console.error('Failed to save preferences:', e);
+            }
+          }
+
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: toolBlock.id,
+            content: 'Preferences saved.',
+          });
+        }
       }
 
-      // Second call with tool result to get the assistant's confirmation text
-      const toolResultMsg: Anthropic.MessageParam = {
-        role: 'user',
-        content: [{
-          type: 'tool_result',
-          tool_use_id: toolUseBlock?.id || '',
-          content: cartActions.length > 0
-            ? `Added to cart: ${cartActions.map(i => `${i.qty}× ${i.name} (₹${i.price * i.qty})`).join(', ')}`
-            : 'Could not add items — they may be out of stock or not on the menu.',
-        }],
-      };
-
+      // Second call: get the assistant's confirmation/reply text
       const secondResponse = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 512,
         system: systemPrompt,
-        tools: [ADD_TO_CART_TOOL],
-        messages: [...anthropicMessages, { role: 'assistant', content: response.content }, toolResultMsg],
+        tools,
+        messages: [
+          ...anthropicMessages,
+          { role: 'assistant', content: response.content },
+          { role: 'user', content: toolResults },
+        ],
       });
 
       assistantContent = (secondResponse.content.find(b => b.type === 'text') as Anthropic.TextBlock | undefined)?.text || 'Done!';

@@ -313,8 +313,8 @@ export default function LandingPage() {
               <a href="#features" className="nav-link hide-mobile">Features</a>
               <a href="#demo" className="nav-link hide-mobile">Demo</a>
               <Link href="/login" className="nav-link">Login</Link>
-              <Link href="/login" style={{ fontSize: 13, fontWeight: 700, background: '#F59E0B', color: '#000', padding: '7px 16px', borderRadius: 8, marginLeft: 4 }}>
-                Get started
+              <Link href="/signup" style={{ fontSize: 13, fontWeight: 700, background: '#F59E0B', color: '#000', padding: '7px 16px', borderRadius: 8, marginLeft: 4 }}>
+                Start free
               </Link>
             </div>
           </div>
@@ -351,11 +351,11 @@ export default function LandingPage() {
 
             {/* CTAs */}
             <div className="hero-cta" style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 72 }}>
-              <Link href="/r/spice-garden" style={{ background: '#F59E0B', color: '#000', fontWeight: 700, fontSize: 15, padding: '13px 28px', borderRadius: 10, display: 'inline-block' }}>
-                Try live demo →
+              <Link href="/signup" style={{ background: '#F59E0B', color: '#000', fontWeight: 700, fontSize: 15, padding: '13px 28px', borderRadius: 10, display: 'inline-block' }}>
+                Start free — no credit card →
               </Link>
-              <Link href="/login" style={{ background: '#1C1917', color: '#FAFAF9', fontWeight: 600, fontSize: 15, padding: '13px 28px', borderRadius: 10, border: '1px solid #292524', display: 'inline-block' }}>
-                Admin login
+              <Link href="/r/spice-garden/t/1" style={{ background: '#1C1917', color: '#FAFAF9', fontWeight: 600, fontSize: 15, padding: '13px 28px', borderRadius: 10, border: '1px solid #292524', display: 'inline-block' }}>
+                See live demo
               </Link>
             </div>
           </div>
@@ -479,9 +479,13 @@ export default function LandingPage() {
                 </Link>
               </div>
               <div style={{ marginTop: 28, padding: 16, background: '#0D0B0A', border: '1px solid #1C1917', borderRadius: 10, fontFamily: 'monospace', fontSize: 12, color: '#78716C', lineHeight: 1.8 }}>
+                <span style={{ color: '#3F3B37', fontFamily: 'sans-serif', fontSize: 11 }}>DEMO CREDENTIALS</span><br />
                 admin@spicegarden.com · password123<br />
-                <span style={{ color: '#3F3B37' }}>super: super@dineai.com</span>
+                <span style={{ color: '#3F3B37' }}>super: super@dineai.com · password123</span>
               </div>
+              <Link href="/signup" style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#F59E0B', fontWeight: 600 }}>
+                Want your own restaurant? Sign up free →
+              </Link>
             </div>
 
             {/* Right — animated chat */}
@@ -505,16 +509,17 @@ export default function LandingPage() {
         <section style={{ borderTop: '1px solid #1C1917', background: '#080706' }}>
           <div style={{ maxWidth: 1100, margin: '0 auto', padding: '120px 28px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 40 }}>
             <h2 style={{ fontSize: 'clamp(36px, 6vw, 88px)', fontWeight: 900, letterSpacing: '-3px', lineHeight: 1.0, flex: 1 }}>
-              Ready<br />to serve<br />
-              <span style={{ color: '#F59E0B' }}>smarter?</span>
+              Your restaurant.<br />Your AI waiter.<br />
+              <span style={{ color: '#F59E0B' }}>Free to start.</span>
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'flex-start' }}>
               <p style={{ fontSize: 15, color: '#78716C', lineHeight: 1.7, maxWidth: 300 }}>
-                Set up your restaurant in under 10 minutes. No credit card. No contracts.
+                Set up in under 10 minutes. No credit card. No contracts. Cancel any time.
               </p>
-              <Link href="/login" style={{ display: 'inline-block', background: '#F59E0B', color: '#000', fontWeight: 800, fontSize: 17, padding: '15px 36px', borderRadius: 12 }}>
-                Get started free →
+              <Link href="/signup" style={{ display: 'inline-block', background: '#F59E0B', color: '#000', fontWeight: 800, fontSize: 17, padding: '15px 36px', borderRadius: 12 }}>
+                Create your restaurant →
               </Link>
+              <Link href="/login" style={{ fontSize: 13, color: '#3F3B37' }}>Already have an account? Log in</Link>
             </div>
           </div>
         </section>
@@ -530,7 +535,7 @@ export default function LandingPage() {
               <span style={{ fontWeight: 700, fontSize: 14 }}>DineAI</span>
             </div>
             <div style={{ display: 'flex', gap: 24 }}>
-              {[['Admin login', '/login'], ['Demo', '/r/spice-garden'], ['Table 1', '/r/spice-garden/t/1']].map(([l, h]) => (
+              {[['Sign up', '/signup'], ['Login', '/login'], ['Live demo', '/r/spice-garden/t/1']].map(([l, h]) => (
                 <Link key={l} href={h} style={{ fontSize: 13, color: '#3F3B37' }}>{l}</Link>
               ))}
             </div>

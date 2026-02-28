@@ -172,14 +172,17 @@ export default function ChatInterface({
     saveMessages(newMessages);
     setLoading(true);
     try {
+      const deviceId = localStorage.getItem('dineai_device') || '';
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           session_id: sessionId,
           restaurant_id: restaurant.id,
-          messages: newMessages,
+          // Strip cartAdded field — only send role/content to AI
+          messages: newMessages.map(({ role, content }) => ({ role, content })),
           cart,
+          device_id: deviceId,
         }),
       });
       const data = await res.json();
@@ -260,50 +263,38 @@ export default function ChatInterface({
     (!vegOnly || i.veg)
   );
 
+  const NAV = [
+    { id: 'chat' as const, label: 'Chat', icon: '💬' },
+    { id: 'menu' as const, label: 'Menu', icon: '🍽️' },
+    { id: 'cart' as const, label: 'Cart', icon: '🛒' },
+    { id: 'orders' as const, label: 'Orders', icon: '📋' },
+  ];
+
   return (
-    <div style={{ minHeight: '100dvh', background: T.bg, color: T.tx, fontFamily: "'DM Sans', -apple-system, sans-serif", display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
+    <div style={{ height: '100dvh', background: T.bg, color: T.tx, fontFamily: "'DM Sans', -apple-system, sans-serif", display: 'flex', flexDirection: 'column', maxWidth: 480, margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ background: T.bgCard, borderBottom: `1px solid ${T.brd}`, padding: '16px 20px' }}>
+      <div style={{ background: T.bgCard, borderBottom: `1px solid ${T.brd}`, padding: '14px 20px', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 28 }}>{restaurant.logo_emoji || '🍽️'}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.5px' }}>{restaurant.name}</div>
+          <span style={{ fontSize: 26 }}>{restaurant.logo_emoji || '🍽️'}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{restaurant.name}</div>
             {tableLabel && <div style={{ fontSize: 12, color: T.acc }}>{tableLabel}</div>}
           </div>
           {!nameSet && (
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
               <input
                 placeholder="Your name"
                 value={customerName}
                 onChange={e => setCustomerName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && setName()}
-                style={{ background: T.bgEl, border: `1px solid ${T.brd}`, borderRadius: 8, padding: '6px 10px', color: T.tx, fontSize: 13, width: 110, outline: 'none' }}
+                style={{ background: T.bgEl, border: `1px solid ${T.brd}`, borderRadius: 8, padding: '6px 10px', color: T.tx, fontSize: 13, width: 100, outline: 'none' }}
               />
               <button onClick={setName} style={{ background: T.acc, color: '#000', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                 Go
               </button>
             </div>
           )}
-          {nameSet && <span style={{ fontSize: 13, color: T.txM }}>Hi, {customerName}!</span>}
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, marginTop: 14 }}>
-          {(['chat', 'menu', 'cart', 'orders'] as const).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                flex: 1, padding: '8px 4px', border: 'none', borderRadius: 8, cursor: 'pointer',
-                background: tab === t ? T.acc : T.bgEl,
-                color: tab === t ? '#000' : T.txM,
-                fontWeight: tab === t ? 700 : 400,
-                fontSize: 13, position: 'relative',
-              }}
-            >
-              {t === 'cart' ? `Cart${cartCount > 0 ? ` (${cartCount})` : ''}` : t.charAt(0).toUpperCase() + t.slice(1)}
-            </button>
-          ))}
+          {nameSet && <span style={{ fontSize: 13, color: T.txM, flexShrink: 0 }}>Hi, {customerName}!</span>}
         </div>
       </div>
 
@@ -543,6 +534,35 @@ export default function ChatInterface({
           )}
         </div>
       )}
+
+      {/* Bottom nav */}
+      <div style={{ background: T.bgCard, borderTop: `1px solid ${T.brd}`, display: 'flex', flexShrink: 0, paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {NAV.map(n => {
+          const active = tab === n.id;
+          const badge = n.id === 'cart' && cartCount > 0 ? cartCount : null;
+          return (
+            <button
+              key={n.id}
+              onClick={() => setTab(n.id)}
+              style={{
+                flex: 1, padding: '10px 4px 8px', border: 'none', background: 'none', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                color: active ? T.acc : T.txD,
+                position: 'relative',
+              }}
+            >
+              <span style={{ fontSize: 20, lineHeight: 1 }}>{n.icon}</span>
+              <span style={{ fontSize: 10, fontWeight: active ? 700 : 400, letterSpacing: '0.02em' }}>{n.label}</span>
+              {badge && (
+                <span style={{ position: 'absolute', top: 6, left: '50%', transform: 'translateX(4px)', background: T.acc, color: '#000', borderRadius: 10, fontSize: 9, fontWeight: 700, padding: '1px 5px', lineHeight: 1.4 }}>
+                  {badge}
+                </span>
+              )}
+              {active && <span style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: 2, background: T.acc, borderRadius: '0 0 2px 2px' }} />}
+            </button>
+          );
+        })}
+      </div>
 
       <style>{`
         @keyframes bounce {
