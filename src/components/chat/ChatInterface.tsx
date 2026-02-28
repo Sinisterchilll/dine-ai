@@ -42,6 +42,7 @@ interface CartItem {
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  cartAdded?: CartItem[];
 }
 
 interface Order {
@@ -182,7 +183,22 @@ export default function ChatInterface({
         }),
       });
       const data = await res.json();
-      saveMessages([...newMessages, { role: 'assistant', content: data.content || 'Sorry, something went wrong.' }]);
+      const cartItemsAdded: CartItem[] = data.cartActions || [];
+      if (cartItemsAdded.length > 0) {
+        const updated = [...cart];
+        for (const action of cartItemsAdded) {
+          const existing = updated.find(c => c.id === action.id);
+          if (existing) existing.qty += action.qty;
+          else updated.push({ id: action.id, name: action.name, price: action.price, qty: action.qty });
+        }
+        saveCart(updated);
+      }
+      const assistantMsg: Message = {
+        role: 'assistant',
+        content: data.content || 'Sorry, something went wrong.',
+        cartAdded: cartItemsAdded.length > 0 ? cartItemsAdded : undefined,
+      };
+      saveMessages([...newMessages, assistantMsg]);
     } catch {
       saveMessages([...newMessages, { role: 'assistant', content: 'Sorry, I ran into an issue. Please try again.' }]);
     }
@@ -296,22 +312,34 @@ export default function ChatInterface({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, overflow: 'auto', padding: '16px 16px 0' }}>
             {messages.map((m, i) => (
-              <div key={i} style={{ marginBottom: 12, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
+              <div key={i} style={{ marginBottom: 12, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-end' }}>
                 {m.role === 'assistant' && (
-                  <span style={{ fontSize: 20, marginRight: 8, alignSelf: 'flex-end' }}>🤖</span>
+                  <span style={{ fontSize: 20, marginRight: 8, flexShrink: 0 }}>🤖</span>
                 )}
-                <div style={{
-                  maxWidth: '80%',
-                  padding: '10px 14px',
-                  borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
-                  background: m.role === 'user' ? T.acc : T.bgCard,
-                  color: m.role === 'user' ? '#000' : T.tx,
-                  fontSize: 14,
-                  lineHeight: 1.5,
-                  border: m.role === 'assistant' ? `1px solid ${T.brd}` : 'none',
-                  whiteSpace: 'pre-wrap',
-                }}>
-                  {m.content}
+                <div style={{ maxWidth: '80%' }}>
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: m.role === 'user' ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
+                    background: m.role === 'user' ? T.acc : T.bgCard,
+                    color: m.role === 'user' ? '#000' : T.tx,
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                    border: m.role === 'assistant' ? `1px solid ${T.brd}` : 'none',
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {m.content}
+                  </div>
+                  {m.cartAdded && m.cartAdded.length > 0 && (
+                    <div style={{ marginTop: 6, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 8, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>🛒</span>
+                      <span style={{ fontSize: 12, color: '#22C55E', flex: 1, lineHeight: 1.3 }}>
+                        {m.cartAdded.map(i => `${i.qty}× ${i.name}`).join(', ')} added to cart
+                      </span>
+                      <button onClick={() => setTab('cart')} style={{ fontSize: 11, color: T.acc, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, whiteSpace: 'nowrap', padding: 0 }}>
+                        View →
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
