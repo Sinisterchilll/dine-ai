@@ -30,33 +30,59 @@ export default function MenuPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   async function loadItems() {
-    const res = await fetch('/api/admin/menu');
-    if (res.ok) setItems(await res.json());
-    setLoading(false);
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await fetch('/api/admin/menu');
+      if (res.ok) {
+        setItems(await res.json());
+      } else {
+        setError(true);
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { loadItems(); }, []);
 
   async function toggleField(id: number, field: string, value: boolean) {
-    const res = await fetch(`/api/admin/menu/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value }),
-    });
-    if (res.ok) {
-      setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
-      toast.success('Updated');
+    // Optimistic update
+    setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+    try {
+      const res = await fetch(`/api/admin/menu/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!res.ok) {
+        // Revert on failure
+        setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: !value } : item));
+        toast.error('Failed to update');
+      }
+    } catch {
+      setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: !value } : item));
+      toast.error('Network error');
     }
   }
 
   async function deleteItem(id: number) {
     if (!confirm('Delete this item?')) return;
-    const res = await fetch(`/api/admin/menu/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      setItems(items.filter(i => i.id !== id));
-      toast.success('Deleted');
+    try {
+      const res = await fetch(`/api/admin/menu/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setItems(items.filter(i => i.id !== id));
+        toast.success('Deleted');
+      } else {
+        toast.error('Failed to delete');
+      }
+    } catch {
+      toast.error('Network error');
     }
   }
 
@@ -92,7 +118,23 @@ export default function MenuPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading...</div>
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-16 bg-muted rounded-lg animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="mb-3">Failed to load menu items.</p>
+          <Button variant="outline" onClick={loadItems}>Try again</Button>
+        </div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="mb-4">No menu items yet.</p>
+          <Link href="/admin/menu/new">
+            <Button>Add your first item</Button>
+          </Link>
+        </div>
       ) : (
         <div className="space-y-6">
           {Object.entries(grouped).map(([cat, catItems]) => (
@@ -111,6 +153,7 @@ export default function MenuPage() {
                         {item.is_popular && <Badge variant="secondary">Popular</Badge>}
                         {item.is_chef_special && <Badge variant="outline">Chef&apos;s Special</Badge>}
                         {item.is_today_special && <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">Today&apos;s Special</Badge>}
+                        {!item.in_stock && <Badge variant="destructive" className="text-xs">Out of Stock</Badge>}
                       </div>
                       <div className="text-sm text-muted-foreground mt-0.5">{formatCurrency(item.price)}</div>
                     </div>
@@ -141,6 +184,9 @@ export default function MenuPage() {
               </div>
             </div>
           ))}
+          {filtered.length === 0 && search && (
+            <div className="text-center py-8 text-muted-foreground text-sm">No items match &ldquo;{search}&rdquo;</div>
+          )}
         </div>
       )}
     </div>

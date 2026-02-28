@@ -18,6 +18,7 @@ export default function MenuItemForm({ itemId }: { itemId?: string }) {
   const router = useRouter();
   const isEdit = !!itemId && itemId !== 'new';
   const [loading, setLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(isEdit);
   const [categories, setCategories] = useState<Category[]>([]);
 
   const [form, setForm] = useState({
@@ -28,29 +29,47 @@ export default function MenuItemForm({ itemId }: { itemId?: string }) {
   });
 
   useEffect(() => {
-    fetch('/api/admin/categories').then(r => r.json()).then(setCategories);
+    fetch('/api/admin/categories')
+      .then(r => r.ok ? r.json() : [])
+      .then(setCategories)
+      .catch(() => toast.error('Failed to load categories'));
+
     if (isEdit) {
-      fetch(`/api/admin/menu/${itemId}`).then(r => r.json()).then(data => {
-        setForm({
-          name: data.name || '',
-          description: data.description || '',
-          price: data.price?.toString() || '',
-          category_id: data.category_id?.toString() || '',
-          veg: data.veg ?? true,
-          spice_level: data.spice_level?.toString() || '0',
-          calories: data.calories?.toString() || '',
-          allergens: JSON.parse(data.allergens || '[]').join(', '),
-          is_popular: data.is_popular || false,
-          is_chef_special: data.is_chef_special || false,
-          is_today_special: data.is_today_special || false,
-          in_stock: data.in_stock ?? true,
-        });
-      });
+      setDataLoading(true);
+      fetch(`/api/admin/menu/${itemId}`)
+        .then(r => r.ok ? r.json() : Promise.reject(new Error('Not found')))
+        .then(data => {
+          let allergensList = '';
+          try { allergensList = JSON.parse(data.allergens || '[]').join(', '); } catch {}
+          setForm({
+            name: data.name || '',
+            description: data.description || '',
+            price: data.price?.toString() || '',
+            category_id: data.category_id?.toString() || '',
+            veg: data.veg ?? true,
+            spice_level: data.spice_level?.toString() || '0',
+            calories: data.calories?.toString() || '',
+            allergens: allergensList,
+            is_popular: data.is_popular || false,
+            is_chef_special: data.is_chef_special || false,
+            is_today_special: data.is_today_special || false,
+            in_stock: data.in_stock ?? true,
+          });
+        })
+        .catch(() => {
+          toast.error('Failed to load item');
+          router.push('/admin/menu');
+        })
+        .finally(() => setDataLoading(false));
     }
-  }, [isEdit, itemId]);
+  }, [isEdit, itemId, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.name.trim()) { toast.error('Name is required'); return; }
+    if (!form.price || isNaN(parseFloat(form.price))) { toast.error('Valid price is required'); return; }
+    if (!form.category_id) { toast.error('Category is required'); return; }
+
     setLoading(true);
     const body = {
       ...form,
@@ -62,23 +81,39 @@ export default function MenuItemForm({ itemId }: { itemId?: string }) {
     };
     const url = isEdit ? `/api/admin/menu/${itemId}` : '/api/admin/menu';
     const method = isEdit ? 'PUT' : 'POST';
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      toast.success(isEdit ? 'Item updated' : 'Item created');
-      router.push('/admin/menu');
-    } else {
-      const err = await res.json();
-      toast.error(err.error || 'Failed');
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        toast.success(isEdit ? 'Item updated' : 'Item created');
+        router.push('/admin/menu');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Failed to save item');
+      }
+    } catch {
+      toast.error('Network error — please try again');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   function set(field: string, value: string | boolean) {
     setForm(f => ({ ...f, [field]: value }));
+  }
+
+  if (dataLoading) {
+    return (
+      <div className="p-8 max-w-2xl space-y-6">
+        <div className="h-6 w-24 bg-muted rounded animate-pulse" />
+        <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+        <div className="h-48 bg-muted rounded-lg animate-pulse" />
+        <div className="h-48 bg-muted rounded-lg animate-pulse" />
+      </div>
+    );
   }
 
   return (
@@ -102,7 +137,7 @@ export default function MenuItemForm({ itemId }: { itemId?: string }) {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Price (₹) *</Label>
-                <Input type="number" step="0.01" value={form.price} onChange={e => set('price', e.target.value)} required />
+                <Input type="number" step="0.01" min="0" value={form.price} onChange={e => set('price', e.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label>Category *</Label>
@@ -135,7 +170,7 @@ export default function MenuItemForm({ itemId }: { itemId?: string }) {
               </div>
               <div className="space-y-2">
                 <Label>Calories</Label>
-                <Input type="number" value={form.calories} onChange={e => set('calories', e.target.value)} placeholder="e.g. 350" />
+                <Input type="number" min="0" value={form.calories} onChange={e => set('calories', e.target.value)} placeholder="e.g. 350" />
               </div>
             </div>
             <div className="space-y-2">

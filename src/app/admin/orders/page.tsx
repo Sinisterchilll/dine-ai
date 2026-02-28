@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 
@@ -33,11 +33,22 @@ const STATUS_COLORS: Record<string, string> = {
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   async function load() {
-    const res = await fetch('/api/admin/orders');
-    if (res.ok) setOrders(await res.json());
-    setLoading(false);
+    try {
+      const res = await fetch('/api/admin/orders');
+      if (res.ok) {
+        setOrders(await res.json());
+        setError(false);
+      } else {
+        setError(true);
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -47,14 +58,23 @@ export default function OrdersPage() {
   }, []);
 
   async function updateStatus(id: number, status: string) {
-    const res = await fetch('/api/admin/orders', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, status }),
-    });
-    if (res.ok) {
-      setOrders(orders.map(o => o.id === id ? { ...o, status } : o));
-      toast.success('Status updated');
+    // Optimistic update
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    try {
+      const res = await fetch('/api/admin/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status }),
+      });
+      if (res.ok) {
+        toast.success('Status updated');
+      } else {
+        toast.error('Failed to update status');
+        load(); // Reload to revert
+      }
+    } catch {
+      toast.error('Network error');
+      load();
     }
   }
 
@@ -62,7 +82,8 @@ export default function OrdersPage() {
   const pastOrders = orders.filter(o => ['delivered', 'cancelled'].includes(o.status || ''));
 
   function OrderCard({ order }: { order: Order }) {
-    const items: CartItem[] = JSON.parse(order.items);
+    let items: CartItem[] = [];
+    try { items = JSON.parse(order.items); } catch {}
     return (
       <Card>
         <CardContent className="p-4">
@@ -128,7 +149,16 @@ export default function OrdersPage() {
       </div>
 
       {loading ? (
-        <div className="text-muted-foreground">Loading...</div>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-32 bg-muted rounded-lg animate-pulse" />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="mb-3">Failed to load orders.</p>
+          <Button variant="outline" onClick={load}>Try again</Button>
+        </div>
       ) : orders.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <div className="text-4xl mb-3">📋</div>

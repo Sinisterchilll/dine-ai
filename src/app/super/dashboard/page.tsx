@@ -3,15 +3,16 @@ import { db } from '@/lib/db';
 import { restaurants, sessions, token_usage } from '@/lib/db/schema';
 import { sql } from 'drizzle-orm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
 
 export default async function SuperDashboard() {
   const [totalRests] = await db.select({ count: sql<number>`count(*)` }).from(restaurants);
   const [totalSessions] = await db.select({ count: sql<number>`count(*)` }).from(sessions);
   const [todaySessions] = await db.select({ count: sql<number>`count(*)` }).from(sessions)
-    .where(sql`date(${sessions.created_at}) = date('now')`);
+    .where(sql`${sessions.created_at}::date = CURRENT_DATE`);
   const [costStats] = await db.select({
     total: sql<number>`sum(${token_usage.cost_usd})`,
-    month: sql<number>`sum(case when strftime('%Y-%m', ${token_usage.created_at}) = strftime('%Y-%m', 'now') then ${token_usage.cost_usd} else 0 end)`,
+    month: sql<number>`sum(case when date_trunc('month', ${token_usage.created_at}) = date_trunc('month', now()) then ${token_usage.cost_usd} else 0 end)`,
     tokens: sql<number>`sum(${token_usage.input_tokens} + ${token_usage.output_tokens})`,
   }).from(token_usage);
 
@@ -47,7 +48,10 @@ export default async function SuperDashboard() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Restaurants</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Recent Restaurants</CardTitle>
+          <Link href="/super/restaurants" className="text-sm text-amber-400 hover:underline">View all →</Link>
+        </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {recentRestaurants.map(r => (
