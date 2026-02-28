@@ -1,25 +1,28 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 import * as schema from '../src/lib/db/schema';
 import bcrypt from 'bcrypt';
-import path from 'path';
 
-const sqlite = new Database(path.join(process.cwd(), 'dineai.db'));
-const db = drizzle(sqlite, { schema });
+const client = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
+const db = drizzle(client, { schema });
 
 async function seed() {
   console.log('Seeding database...');
 
-  sqlite.exec('DELETE FROM token_usage');
-  sqlite.exec('DELETE FROM chat_messages');
-  sqlite.exec('DELETE FROM orders');
-  sqlite.exec('DELETE FROM sessions');
-  sqlite.exec('DELETE FROM tables');
-  sqlite.exec('DELETE FROM menu_items');
-  sqlite.exec('DELETE FROM categories');
-  sqlite.exec('DELETE FROM restaurant_configs');
-  sqlite.exec('DELETE FROM admins');
-  sqlite.exec('DELETE FROM restaurants');
+  // Clear in FK-dependency order
+  await db.delete(schema.token_usage);
+  await db.delete(schema.chat_messages);
+  await db.delete(schema.orders);
+  await db.delete(schema.sessions);
+  await db.delete(schema.tables);
+  await db.delete(schema.menu_items);
+  await db.delete(schema.categories);
+  await db.delete(schema.restaurant_configs);
+  await db.delete(schema.admins);
+  await db.delete(schema.restaurants);
 
   const [restaurant] = await db.insert(schema.restaurants).values({
     name: 'Spice Garden',
@@ -127,7 +130,7 @@ async function seed() {
   console.log('✓ Seed complete!');
   console.log('  Super admin: super@dineai.com / password123');
   console.log('  Restaurant admin: admin@spicegarden.com / password123');
-  sqlite.close();
+  await client.end();
 }
 
 seed().catch(console.error);

@@ -3,8 +3,8 @@ import type { Config } from 'drizzle-kit';
 export default {
   schema: './src/lib/db/schema.ts',
   out: './drizzle/migrations',
-  dialect: 'sqlite',
+  dialect: 'postgresql',
   dbCredentials: {
-    url: './dineai.db',
+    url: process.env.DATABASE_URL!,
   },
 } satisfies Config;
